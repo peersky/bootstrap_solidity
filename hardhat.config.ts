@@ -12,6 +12,9 @@ import * as ipfsUtils from "./utils/ipfs";
 import fs from "fs";
 import "hardhat-gas-reporter";
 import "hardhat-contract-sizer";
+
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+
 task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
   const accounts = await hre.ethers.getSigners();
 
@@ -19,6 +22,21 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
     console.log(account.address);
   }
 });
+
+task("deployContract", "Deploys contract")
+  .addParam("contractName", "contract name")
+  .addOptionalVariadicPositionalParam(
+    "constructorArgs",
+    "Constructor arguments"
+  )
+  .setAction(async (taskArgs, hre) => {
+    const address = await deploy({
+      hre,
+      ContractName: taskArgs.contractName,
+      constructorArgs: taskArgs.constructorArgs,
+    });
+    console.log("Deployed ", taskArgs.contractName, "at: ", address);
+  });
 
 task("upload2IPFS", "Uploads files to ipfs")
   .addParam("path", "file path")
@@ -74,20 +92,20 @@ export default {
   networks: {
     mumbai: {
       url: "https://matic-mumbai.chainstacklabs.com",
-      accounts: [process.env.PRIVATE_KEY && process.env.PRIVATE_KEY],
+      accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
     },
     matic: {
       url: process.env.RPC_URL ?? "",
-      accounts: [process.env.PRIVATE_KEY && process.env.PRIVATE_KEY],
+      accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
     },
     ganache: {
       url: process.env.GANACHE_RPC_URL ?? "",
-      accounts: [process.env.PRIVATE_KEY && process.env.PRIVATE_KEY],
+      accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
     },
     gorli: {
       url: process.env.GORLI_RPC_URL ?? "",
       accounts: [
-        process.env.GORLI_PRIVATE_KEY && process.env.GORLI_PRIVATE_KEY,
+        accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
       ],
     },
   },
@@ -116,52 +134,7 @@ export default {
       },
     ],
   },
-  diamondAbi: [
-    {
-      // (required) The name of your Diamond ABI
-      name: "MultipassDiamond",
-      include: [
-        "DNSFacet",
-        "OwnershipFacet",
-        "DiamondLoupeFacet",
-        "EIP712InspectorFacet",
-      ],
-      // We explicitly set `strict` to `true` because we want to validate our facets don't accidentally provide overlapping functions
-      strict: true,
-      // We use our diamond utils to filter some functions we ignore from the combined ABI
-      filter(
-        abiElement: unknown,
-        index: number,
-        abi: unknown[],
-        fullyQualifiedName: string
-      ) {
-        // const changes = new diamondUtils.DiamondChanges();
-        const signature = toSignature(abiElement);
-        return isIncluded(fullyQualifiedName, signature);
-      },
-    },
-    {
-      name: "BestOfDiamond",
-      include: [
-        "BestOfFacet",
-        "OwnershipFacet",
-        "DiamondLoupeFacet",
-        "RequirementsFacet",
-        "GameMastersFacet",
-        "EIP712InspectorFacet",
-      ],
-      strict: true,
-      filter(
-        abiElement: unknown,
-        index: number,
-        abi: unknown[],
-        fullyQualifiedName: string
-      ) {
-        const signature = toSignature(abiElement);
-        return isIncluded(fullyQualifiedName, signature);
-      },
-    },
-  ],
+  diamondAbi: [],
   typechain: {
     outDir: "types/typechain",
     target: "ethers-v5",
@@ -174,8 +147,6 @@ export default {
     runOnCompile: true,
     clear: true,
     format: "fullName",
-    // flat: true,
-    // only: [":ERC20$"],
     spacing: 2,
     pretty: false,
   },
